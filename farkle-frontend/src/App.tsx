@@ -1,122 +1,161 @@
 import React, { useState } from 'react';
+import Dice from './components/Dice';
 import './styles/App.css'
 
-function App() {
-  const [dice, setDice] = useState(Array(6).fill(1));
-  const [player1Score, setPlayer1Score] = useState(0);
-  const [player2Score, setPlayer2Score] = useState(0);
-  const [turnScore, setTurnScore] = useState(0);
-  const [selectedDice, setSelectedDice] = useState([]);
-  const [gameMessage, setGameMessage] = useState("Start your turn by rolling all dice!");
-  const [isPlayer1Turn, setIsPlayer1Turn] = useState(true);
-  const [round, setRound] = useState(1);
+const FarkleGame: React.FC = () => {
+  const targetScore = 5000;
+  const [dice, setDice] = useState<number[]>(Array(6).fill(1));
+  const [selectedDice, setSelectedDice] = useState<boolean[]>(Array(6).fill(false));
+  const [currentTurnScore, setCurrentTurnScore] = useState<number>(0);
+  const [remainingDice, setRemainingDice] = useState<number[]>(dice);
+  const [playerTurn, setPlayerTurn] = useState<number>(1);
+  const [playerScores, setPlayerScores] = useState({ player1: 0, player2: 0 });
+  const [gameOver, setGameOver] = useState<boolean>(false);
+  const [winner, setWinner] = useState<string | null>(null);
+  const [farkle, setFarkle] = useState<boolean>(false);
 
-  // Roll all dice or remaining dice
   const rollDice = () => {
-    const newDice = dice.map((die, index) =>
-      selectedDice.includes(index) ? die : Math.floor(Math.random() * 6) + 1
-    );
-    setDice(newDice);
-    calculateScore(newDice);
+    const rolledDice = remainingDice.map(() => Math.floor(Math.random() * 6) + 1);
+    setRemainingDice(rolledDice);
+    setSelectedDice(Array(6).fill(false)); 
+  
+    calculateScore(rolledDice);
   };
 
-  // Select and set aside scoring dice
-  const selectDie = (index) => {
-    if (!selectedDice.includes(index)) {
-      setSelectedDice([...selectedDice, index]);
-    }
+  const toggleSelectDice = (index: number) => {
+    setSelectedDice((prev) => prev.map((sel, i) => (i === index ? !sel : sel)));
   };
 
-  // End the turn and add the turn score to the current player's total score
-  const endTurn = () => {
-    if (isPlayer1Turn) {
-      setPlayer1Score(player1Score + turnScore);
-    } else {
-      setPlayer2Score(player2Score + turnScore);
-    }
-    setTurnScore(0);
-    setSelectedDice([]);
-    setDice(Array(6).fill(1));
-    setGameMessage("Turn ended. Next player's turn!");
-    setIsPlayer1Turn(!isPlayer1Turn);
-    setRound(round + 1);
-  };
 
-  // Calculate the score for the current roll
-  const calculateScore = (currentDice) => {
-    let counts = Array(6).fill(0);
-    currentDice.forEach((die, index) => {
-      if (!selectedDice.includes(index)) {
-        counts[die - 1]++;
-      }
-    });
-
+  const calculateScore = (rolledDice: number[]) => {
     let tempScore = 0;
-    // Scoring for 1s and 5s
-    tempScore += counts[0] * 100;
-    tempScore += counts[4] * 50;
-
-    // Scoring for three or more of a kind
-    for (let i = 0; i < 6; i++) {
-      if (counts[i] >= 3) {
-        tempScore += (i === 0 ? 1000 : (i + 1) * 100) * Math.pow(2, counts[i] - 3);
+    const diceCount = Array(6).fill(0);
+  
+    rolledDice.forEach((die) => {
+      diceCount[die - 1]++;
+    });
+  
+  
+    tempScore += diceCount[0] * 100; 
+    tempScore += diceCount[4] * 50;  
+  
+  
+    for (let i = 1; i < 6; i++) {
+      if (diceCount[i] >= 3) {
+        tempScore += (i + 1) * 100; 
+        if (diceCount[i] >= 4) {
+          tempScore += (i + 1) * 100;
+        }
       }
     }
+  
 
+    if (diceCount[0] >= 3) {
+      tempScore += 1000 - (3 * 100); 
+    }
+  
+    
     if (tempScore === 0) {
-      setGameMessage("Farkle! You lost your turn score.");
-      setTurnScore(0);
-      setSelectedDice([]);
-      return;
+      setFarkle(true);
+    } else {
+      setCurrentTurnScore((prev) => prev + tempScore);
+    }
+  };
+
+  
+  const endTurn = () => {
+    if (farkle) {
+      alert("Farkle! No points this round.");
+      setCurrentTurnScore(0); 
+      setFarkle(false);
+    } else {
+      
+      setPlayerScores((prevScores) => {
+        const updatedScores = { ...prevScores };
+        if (playerTurn === 1) {
+          updatedScores.player1 += currentTurnScore;
+        } else {
+          updatedScores.player2 += currentTurnScore;
+        }
+        return updatedScores;
+      });
     }
 
-    setTurnScore(turnScore + tempScore);
-    setGameMessage("You scored " + tempScore + " points. Keep rolling or end your turn!");
+    checkEndGame(); 
+    setCurrentTurnScore(0); 
+    setPlayerTurn(playerTurn === 1 ? 2 : 1); 
+  };
+
+  const quitTurn = () => {
+    endTurn();
+  };
+
+  const checkEndGame = () => {
+    if (playerScores.player1 >= targetScore || playerScores.player2 >= targetScore) {
+      if (playerScores.player1 >= targetScore) {
+        setWinner('Player 1');
+      } else if (playerScores.player2 >= targetScore) {
+        setWinner('Player 2');
+      }
+      setGameOver(true);
+    }
+  };
+
+  const resetGame = () => {
+    setDice(Array(6).fill(1));
+    setSelectedDice(Array(6).fill(false));
+    setCurrentTurnScore(0);
+    setPlayerTurn(1);
+    setPlayerScores({ player1: 0, player2: 0 });
+    setGameOver(false);
+    setWinner(null);
+    setFarkle(false);
   };
 
   return (
-    <div className="App">
-      <header className="header">
-        <h1>Farkle Game</h1>
-        <div className="player-info opponent-info">
-          <p>Total: <span className="total-score">{player2Score}</span> / <span className="target-score red">5000</span></p>
-          <p>Current: {isPlayer1Turn ? 0 : turnScore}</p>
-          <p className="info-row">
-            Round: <span className="red">{round}</span>
-            <span className="selected-dice">Selected: <span className="red">{selectedDice.length}</span></span>
-          </p>
+    <div className="farkle-game">
+      <h1>Farkle Game</h1>
+      {gameOver ? (
+        <div className="game-over">
+          <h2>{winner} Wins!</h2>
+          <button onClick={resetGame}>Play Again</button>
         </div>
-        <div className="player-info player1-info">
-          <p>Total: <span className="total-score">{player1Score}</span> / <span className="target-score red">5000</span></p>
-          <p>Current: {isPlayer1Turn ? turnScore : 0}</p>
-          <p className="info-row">
-            Round: <span className="red">{round}</span>
-            <span className="selected-dice">Selected: <span className="red">{selectedDice.length}</span></span>
-          </p>
-        </div>
-      </header>
-      <main className="main-container">
-        <div className="dice-container">
-          {dice.map((die, index) => (
-            <div
-              key={index}
-              className={`die ${selectedDice.includes(index) ? 'selected' : ''}`}
-              onClick={() => selectDie(index)}
-            >
-              {die}
-            </div>
-          ))}
-        </div>
-        <div className="buttons-container">
-          <button className="roll-button" onClick={rollDice}>Roll Dice (F)</button>
-          <button className="end-button" onClick={endTurn}>End Turn (Q)</button>
-        </div>
-      </main>
-      <footer className="footer">
-        <p>Use "E" to select dice, "F" to roll, and "Q" to end your turn.</p>
-      </footer>
+      ) : (
+        <>
+          
+          <div className="scoreboard player-2-scoreboard">
+            <h2>Opponent’s Tab</h2>
+            <p>Total: {playerScores.player2}</p>
+            <p>Round: {playerTurn === 2 ? currentTurnScore : 0}</p>
+          </div>
+
+          
+          <div className="scoreboard player-1-scoreboard">
+            <h2>Your Tab</h2>
+            <p>Total: {playerScores.player1}</p>
+            <p>Round: {playerTurn === 1 ? currentTurnScore : 0}</p>
+          </div>
+
+          <div className="dice-container">
+            {remainingDice.map((die, index) => (
+              <Dice
+                key={index}
+                value={die}
+                selected={selectedDice[index]}
+                onSelect={() => toggleSelectDice(index)}
+              />
+            ))}
+          </div>
+
+          <div>
+            <button onClick={rollDice}>Roll Dice</button>
+            <button onClick={endTurn}>End Turn</button>
+            <button onClick={quitTurn}>Quit Turn</button>
+          </div>
+        </>
+      )}
     </div>
   );
-}
+};
 
-export default App;
+export default FarkleGame;
